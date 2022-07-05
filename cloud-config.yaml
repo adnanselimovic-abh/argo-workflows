@@ -19,6 +19,6 @@ runcmd:
   - 'echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> /etc/bash.bashrc'
   - 'echo "alias k=kubectl" >> /etc/bash.bashrc'
   - 'cd /home/ubuntu/ && git clone https://github.com/adnanselimovic-abh/argo-workflows'
-  - 'cd argo-workflows'
+  - 'chown -R ubuntu argo-workflows && cd argo-workflows'
   - './scripts/setup-k3s.sh'
   - './scripts/install-argo-workflows.sh'
