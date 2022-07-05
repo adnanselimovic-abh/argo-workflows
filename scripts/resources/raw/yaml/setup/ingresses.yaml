@@ -16,6 +16,16 @@ spec:
           namespace: kube-system
 ---
 apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: argo-prefix
+  namespace: argo
+spec:
+  stripPrefix:
+    prefixes:
+    - /argo/
+---
+apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
   name: argo
@@ -27,6 +37,9 @@ spec:
   routes:
     - match: Host(`local.k3s`) && PathPrefix(`/argo`)
       kind: Rule
+      middlewares:
+        - name: argo-prefix
+          namespace: argo
       services:
         - name: atlantbh-argo-workflows-server
           port: 80
