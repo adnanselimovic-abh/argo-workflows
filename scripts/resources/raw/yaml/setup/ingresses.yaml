@@ -44,3 +44,20 @@ spec:
         - name: atlantbh-argo-workflows-server
           port: 80
           namespace: argo
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: argo-events-webhook
+  namespace: argo-events
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`local.k3s`) && PathPrefix(`/trigger-workflow`)
+      kind: Rule
+      services:
+        - name: webhook-eventsource-svc
+          port: 12000
+          namespace: argo-events
