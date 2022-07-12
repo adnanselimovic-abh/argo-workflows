@@ -61,3 +61,13 @@ spec:
         - name: webhook-eventsource-svc
           port: 12000
           namespace: argo-events
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: go-api-prefix
+  namespace: go-api
+spec:
+  stripPrefix:
+    prefixes:
+      - /go-api

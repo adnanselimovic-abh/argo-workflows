@@ -19,7 +19,7 @@ kubectl apply -f scripts/resources/raw/yaml/argo-workflows/service-account-workf
 kubectl apply -f scripts/resources/raw/yaml/argo-events/service-account-events.yaml
 kubectl apply -f scripts/resources/raw/yaml/argo-events/webhook-source.yaml
 kubectl apply -f scripts/resources/raw/yaml/argo-events/eventbus-default.yaml
-kubectl apply -f scripts/resources/raw/yaml/argo-events/webhook-sensor.yaml
+kubectl apply -f scripts/resources/raw/yaml/argo-events/webhook-sensor-cicd.yaml
 
 kubectl apply -f scripts/resources/raw/yaml/argo-workflows/role-go-api.yaml
 kubectl apply -f scripts/resources/raw/yaml/argo-workflows/workflow-cicd-template.yaml
