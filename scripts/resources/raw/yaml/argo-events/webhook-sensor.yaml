@@ -21,6 +21,7 @@ spec:
               metadata:
                 generateName: webhook-
               spec:
+                serviceAccountName: workflow-executor-sa
                 entrypoint: whalesay
                 arguments:
                   parameters:

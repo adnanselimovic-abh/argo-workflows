@@ -1,0 +1,165 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: cicd-workflow-template
+  annotations:
+    workflows.argoproj.io/description: |
+      This workflow is implementing CICD for simple GO API.
+spec:
+  serviceAccountName: workflow-executor-sa
+
+  arguments:
+    parameters:
+      - name: branch
+        value: master
+
+  entrypoint: main
+
+  volumeClaimTemplates:
+    - metadata:
+        name: work
+      spec:
+        accessModes: [ ReadWriteOnce ]
+        resources:
+          requests:
+            storage: 64Mi
+
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: clone
+            template: clone
+          - name: deps
+            template: deps
+            dependencies:
+              - clone
+          - name: build
+            template: build
+            dependencies:
+              - deps
+          - name: docker-build
+            template: docker-build
+            dependencies:
+              - build
+    - name: clone
+      container:
+        volumeMounts:
+          - mountPath: /go/src/github.com/go-api
+            name: work
+            subPath: src
+          - mountPath: /go/pkg/mod
+            name: work
+            subPath: GOMODCACHE
+          - mountPath: /root/.cache/go-build
+            name: work
+            subPath: GOCACHE
+        image: golang:1.18
+        workingDir: /go/src/github.com/go-api
+        command: [ sh, -euxc ]
+        args:
+          - |
+            git clone -v -b "{{workflow.parameters.branch}}" --single-branch --depth 1 https://github.com/adnanselimovic-abh/go-api.git .
+
+    - name: deps
+      container:
+        image: golang:1.18
+        volumeMounts:
+          - mountPath: /go/src/github.com/go-api
+            name: work
+            subPath: src
+          - mountPath: /go/pkg/mod
+            name: work
+            subPath: GOMODCACHE
+          - mountPath: /root/.cache/go-build
+            name: work
+            subPath: GOCACHE
+        workingDir: /go/src/github.com/go-api
+        command: [ sh, -xuce ]
+        args:
+          - |
+            go mod tidy
+
+    - name: build
+      container:
+        image: golang:1.18
+        volumeMounts:
+          - mountPath: /go/src/github.com/go-api
+            name: work
+            subPath: src
+          - mountPath: /go/pkg/mod
+            name: work
+            subPath: GOMODCACHE
+          - mountPath: /root/.cache/go-build
+            name: work
+            subPath: GOCACHE
+        workingDir: /go/src/github.com/go-api
+        command: [ sh, -xuce ]
+        args:
+          - |
+            go build main.go
+
+    - name: docker-build
+      volumes:
+        - name: docker-config
+          secret:
+            secretName: dockerhub
+      container:
+        image: moby/buildkit:v0.9.3-rootless
+        volumeMounts:
+          - mountPath: /go/src/github.com/go-api
+            name: work
+            subPath: src
+          - name: docker-config
+            mountPath: /.docker
+        workingDir: /go/src/github.com/go-api
+        env:
+          - name: BUILDKITD_FLAGS
+            value: --oci-worker-no-process-sandbox
+          - name: DOCKER_CONFIG
+            value: /.docker
+        command:
+          - buildctl-daemonless.sh
+        args:
+          - build
+          - --frontend
+          - dockerfile.v0
+          - --local
+          - context=.
+          - --local
+          - dockerfile=docker/
+          - --output
+          - type=image,name=qdnqn/argo-workflows:1.0.0,push=true
+        securityContext:
+          privileged: true
+#    - name: test
+#      container:
+#        image: golang:1.18
+#        volumeMounts:
+#          - mountPath: /go/src/github.com/go-api
+#            name: work
+#            subPath: src
+#          - mountPath: /go/pkg/mod
+#            name: work
+#            subPath: GOMODCACHE
+#          - mountPath: /root/.cache/go-build
+#            name: work
+#            subPath: GOCACHE
+#        workingDir: /go/src/github.com/go-api
+#        command: [ sh, -euxc ]
+#        args:
+#          - |
+#            go install github.com/jstemmer/go-junit-report@latest
+#            go install github.com/alexec/junit2html@v0.0.2
+#
+#            trap 'cat test.out | go-junit-report | junit2html > test-report.html' EXIT
+#
+#            go test -v ./... 2>&1 > test.out
+#      outputs:
+#        artifacts:
+#          - name: test-report
+#            path: /go/src/github.com/go-api/test-report.html
+#            archive:
+#              none: { }
+#            s3:
+#              key: "{{workflow.parameters.branch}}/test-report.html"

@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: webhook
+spec:
+  template:
+    serviceAccountName: operate-workflow-sa
+  dependencies:
+    - name: cicd-dep
+      eventSourceName: webhook
+      eventName: example
+  triggers:
+    - template:
+        name: argo-cicd-trigger
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                name: cicd-trigger
+              spec:
+                workflowTemplateRef:
+                  name: cicd-workflow-template
+#          parameters:
+#            - src:
+#                dependencyName: test-dep
+#                dataKey: body
+#              dest: spec.arguments.parameters.0.value
