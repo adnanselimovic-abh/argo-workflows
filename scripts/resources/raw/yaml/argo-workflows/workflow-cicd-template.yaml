@@ -150,15 +150,6 @@ spec:
         securityContext:
           privileged: true
 
-    - name: create-namespace-k8s
-      resource:
-        action: apply
-        manifest: |
-          apiVersion: v1
-          kind: Namespace
-          metadata:
-            name: go-api
-
     - name: create-config-k8s
       resource:
         action: apply
