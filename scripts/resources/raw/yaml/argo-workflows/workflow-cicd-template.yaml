@@ -2,6 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: cicd-workflow-template
+  namespace: argo-events
   annotations:
     workflows.argoproj.io/description: |
       This workflow is implementing CICD for simple GO API.
@@ -11,9 +12,12 @@ spec:
   arguments:
     parameters:
       - name: branch
-        value: master
+        value: main
 
   entrypoint: main
+
+  podGC:
+    strategy: OnPodSuccess
 
   volumeClaimTemplates:
     - metadata:
@@ -42,6 +46,19 @@ spec:
             template: docker-build
             dependencies:
               - build
+          - name: create-config
+            template: create-config-k8s
+            dependencies:
+              - docker-build
+          - name: create-secret
+            template: create-secret-k8s
+            dependencies:
+              - docker-build
+          - name: deploy
+            template: deploy
+            dependencies:
+              - create-config
+              - create-secret
     - name: clone
       container:
         volumeMounts:
@@ -103,7 +120,7 @@ spec:
       volumes:
         - name: docker-config
           secret:
-            secretName: dockerhub
+            secretName: docker-config
       container:
         image: moby/buildkit:v0.9.3-rootless
         volumeMounts:
@@ -129,37 +146,55 @@ spec:
           - --local
           - dockerfile=docker/
           - --output
-          - type=image,name=qdnqn/argo-workflows:1.0.0,push=true
+          - type=image,name=docker.io/qdnqn/argo-workflows:1.0.0,push=true
         securityContext:
           privileged: true
-#    - name: test
-#      container:
-#        image: golang:1.18
-#        volumeMounts:
-#          - mountPath: /go/src/github.com/go-api
-#            name: work
-#            subPath: src
-#          - mountPath: /go/pkg/mod
-#            name: work
-#            subPath: GOMODCACHE
-#          - mountPath: /root/.cache/go-build
-#            name: work
-#            subPath: GOCACHE
-#        workingDir: /go/src/github.com/go-api
-#        command: [ sh, -euxc ]
-#        args:
-#          - |
-#            go install github.com/jstemmer/go-junit-report@latest
-#            go install github.com/alexec/junit2html@v0.0.2
-#
-#            trap 'cat test.out | go-junit-report | junit2html > test-report.html' EXIT
-#
-#            go test -v ./... 2>&1 > test.out
-#      outputs:
-#        artifacts:
-#          - name: test-report
-#            path: /go/src/github.com/go-api/test-report.html
-#            archive:
-#              none: { }
-#            s3:
-#              key: "{{workflow.parameters.branch}}/test-report.html"
+
+    - name: create-namespace-k8s
+      resource:
+        action: apply
+        manifest: |
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: go-api
+
+    - name: create-config-k8s
+      resource:
+        action: apply
+        manifest: |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: go-api-config
+            namespace: go-api
+          data:
+            branch: {{workflow.parameters.branch}}
+
+    - name: create-secret-k8s
+      resource:
+        action: apply
+        manifest: |
+          apiVersion: v1
+          kind: Secret
+          type: Opaque
+          metadata:
+            name: go-api-secret
+            namespace: go-api
+          data:
+            username: YWRtaW4=
+
+    - name: deploy
+      container:
+        image: dtzar/helm-kubectl:3.9
+        volumeMounts:
+          - mountPath: /go/src/github.com/go-api-helm
+            name: work
+            subPath: src
+        workingDir: /go/src/github.com/go-api-helm
+        command: [ sh, -xuce ]
+        args:
+          - |
+            [ ! -d "go-api-helm" ] && git clone -v -b "{{workflow.parameters.branch}}" --single-branch --depth 1 https://github.com/adnanselimovic-abh/go-api-helm.git
+            cd go-api-helm
+            helm upgrade --install atlantbh . --namespace go-api --set image.tag=1.0.0
