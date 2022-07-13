@@ -13,6 +13,8 @@ spec:
     parameters:
       - name: branch
         value: main
+      - name: dockerRepo
+        value: docker.io/qdnqn/argo-workflows:1.0.0
 
   entrypoint: main
 
@@ -147,7 +149,7 @@ spec:
           - --local
           - dockerfile=docker/
           - --output
-          - type=image,name=docker.io/qdnqn/argo-workflows:1.0.0,push=true
+          - type=image,name={{workflow.parameters.dockerRepo}},push=true
         securityContext:
           privileged: true
 
