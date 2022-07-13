@@ -20,7 +20,22 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                name: cicd-trigger
+                generateName: ci-cd-from-webhook-
               spec:
+                arguments:
+                  parameters:
+                    - name: branch
+                      value: main
+                    - name: dockerRepo
+                      value: docker.io/qdnqn/argo-workflows:1.0.0
                 workflowTemplateRef:
                   name: cicd-workflow-template
+          parameters:
+            - src:
+                dependencyName: cicd-dep
+                dataKey: body.branch
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: cicd-dep
+                dataKey: body.image
+              dest: spec.arguments.parameters.1.value
